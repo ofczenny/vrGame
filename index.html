@@ -1,33 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-AU">
 <head>
   <meta charset="utf-8">
   <title>A-Frame Test</title>
-
-  <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script&gt;
+  <!-- Ensure the A-Frame library is correctly included -->
+  <script src="https://aframe.io/releases/1.7.2/aframe.min.js"></script>
+  <script>
+    AFRAME.registerComponent('custom-init', {
+      // Custom initialization logic can go here
+    });
+  </script>
+  <style>
+    /* Add custom styles if needed */
+  </style>
 </head>
-
 <body>
-
-<a-scene>
-
-  <a-box
-    position="0 1.5 -4"
-    rotation="0 45 0"
-    color="red">
-  </a-box>
-
-  <a-plane
-    position="0 0 -4"
-    rotation="-90 0 0"
-    width="20"
-    height="20"
-    color="green">
-  </a-plane>
-
-  <a-sky color="lightblue"></a-sky>
-
-</a-scene>
-
+  <a-scene>
+    <a-box position="0 1.5 -4" rotation="0 45 0" color="red"></a-box>
+    <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="green"></a-plane>
+    <a-sky color="lightblue"></a-sky>
+  </a-scene>
 </body>
-    
+</html>
