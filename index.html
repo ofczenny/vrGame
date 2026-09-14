@@ -1,136 +1,131 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>ODM Gear (Canvas Version)</title>
-  <style>
-    body { margin: 0; background: #111; }
-    canvas { display: block; background: #222; }
-  </style>
+  <meta charset="utf-8">
+  <title>ODM Gear Launch Demo</title>
+
+  <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 </head>
+
 <body>
 
-<canvas id="game"></canvas>
+<a-scene>
+
+  <!-- PLAYER (moving object) -->
+  <a-entity id="player" position="0 1.5 -4">
+    <a-sphere radius="0.3" color="red"></a-sphere>
+
+    <!-- CAMERA ATTACHED TO PLAYER -->
+    <a-entity camera look-controls position="0 0 0"></a-entity>
+  </a-entity>
+
+  <!-- GRAPPLE TARGETS -->
+  <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
+  <a-sphere id="rightHook" position="3 3 -4"  radius="0.2" color="blue"></a-sphere>
+
+  <!-- GRAPPLE LINE -->
+  <a-entity id="grappleLine"
+            line="start: 0 0 0; end: 0 0 0; color: #00ffff"
+            visible="false">
+  </a-entity>
+
+  <!-- GROUND -->
+  <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="green"></a-plane>
+
+  <a-sky color="lightblue"></a-sky>
+
+</a-scene>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+  const player = document.querySelector('#player');
+  const leftHook = document.querySelector('#leftHook');
+  const rightHook = document.querySelector('#rightHook');
+  const line = document.querySelector('#grappleLine');
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+  let activeHook = null;
+  let grappling = false;
 
-// Player
-let player = {
-  x: 0,
-  y: 0,
-  vx: 0,
-  vy: 0,
-  size: 20
-};
+  // Player velocity
+  let velocity = {x: 0, y: 0, z: 0};
 
-// Grapple points
-const leftHook  = { x: -200, y: -200 };
-const rightHook = { x:  200, y: -200 };
-
-let activeHook = null;
-let grappling = false;
-
-// Camera offset
-let camX = 0;
-let camY = 0;
-
-// Launch force
-const launchForce = 0.4;
-
-// Input
-window.addEventListener("keydown", e => {
-  if (e.key === "q" || e.key === "Q") {
-    activeHook = leftHook;
-    grappling = true;
-    launch();
-  }
-  if (e.key === "e" || e.key === "E") {
-    activeHook = rightHook;
-    grappling = true;
-    launch();
-  }
-});
-
-window.addEventListener("keyup", () => {
-  grappling = false;
-  activeHook = null;
-});
-
-// Launch player toward hook
-function launch() {
-  if (!activeHook) return;
-
-  const dx = activeHook.x - player.x;
-  const dy = activeHook.y - player.y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-
-  const nx = dx / dist;
-  const ny = dy / dist;
-
-  player.vx = nx * launchForce;
-  player.vy = ny * launchForce;
-}
-
-// Game loop
-function update() {
-  // Apply velocity
-  player.x += player.vx;
-  player.y += player.vy;
-
-  // Momentum decay
-  player.vx *= 0.97;
-  player.vy *= 0.97;
-
-  // Camera follows player
-  camX = player.x - canvas.width / 2;
-  camY = player.y - canvas.height / 2;
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.save();
-  ctx.translate(-camX, -camY);
-
-  // Draw grapple points
-  ctx.fillStyle = "blue";
-  ctx.beginPath();
-  ctx.arc(leftHook.x, leftHook.y, 10, 0, Math.PI * 2);
-  ctx.arc(rightHook.x, rightHook.y, 10, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Draw rope
-  if (grappling && activeHook) {
-    ctx.strokeStyle = "#0ff";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(player.x, player.y);
-    ctx.lineTo(activeHook.x, activeHook.y);
-    ctx.stroke();
+  function vec3(entity) {
+    const p = entity.getAttribute('position');
+    return {x: p.x, y: p.y, z: p.z};
   }
 
-  // Draw player
-  ctx.fillStyle = "red";
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-  ctx.fill();
+  function launchTowardHook() {
+    if (!activeHook) return;
 
-  ctx.restore();
-}
+    const p = vec3(player);
+    const h = vec3(activeHook);
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+    // Draw cable
+    line.setAttribute('visible', true);
+    line.setAttribute('line', `start: ${p.x} ${p.y} ${p.z}; end: ${h.x} ${h.y} ${h.z}`);
 
-loop();
+    // Direction vector
+    const dx = h.x - p.x;
+    const dy = h.y - p.y;
+    const dz = h.z - p.z;
+
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+    // Normalize
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const nz = dz / dist;
+
+    // Launch force
+    const launchForce = 0.25;
+
+    // Apply velocity
+    velocity.x = nx * launchForce;
+    velocity.y = ny * launchForce;
+    velocity.z = nz * launchForce;
+  }
+
+  // Key controls
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'q' || e.key === 'Q') {
+      activeHook = leftHook;
+      grappling = true;
+      launchTowardHook();
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      activeHook = rightHook;
+      grappling = true;
+      launchTowardHook();
+    }
+  });
+
+  window.addEventListener('keyup', () => {
+    grappling = false;
+    activeHook = null;
+    line.setAttribute('visible', false);
+  });
+
+  // Game loop
+  function tick() {
+    const p = vec3(player);
+
+    // Move player
+    player.setAttribute('position', {
+      x: p.x + velocity.x,
+      y: p.y + velocity.y,
+      z: p.z + velocity.z
+    });
+
+    // Momentum decay
+    velocity.x *= 0.97;
+    velocity.y *= 0.97;
+    velocity.z *= 0.97;
+
+    requestAnimationFrame(tick);
+  }
+
+  tick();
 </script>
 
 </body>
 </html>
+
