@@ -11,10 +11,13 @@
 
 <a-scene>
 
-  <!-- Player (camera attached inside) -->
-  <a-entity id="player" position="0 1.5 -4">
+  <!-- Player is now the camera -->
+  <a-entity id="player"
+            camera
+            look-controls
+            wasd-controls-enabled="false"
+            position="0 1.5 -4">
     <a-sphere radius="0.3" color="red"></a-sphere>
-    <a-camera position="0 0 0"></a-camera>
   </a-entity>
 
   <!-- Grapple Targets -->
@@ -73,7 +76,6 @@
     const ny = dy / dist;
     const nz = dz / dist;
 
-    // *** LAUNCH FORCE ***
     const launchForce = 0.25;
 
     velocity.x = nx * launchForce;
