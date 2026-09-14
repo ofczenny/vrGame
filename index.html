@@ -11,8 +11,11 @@
 
 <a-scene>
 
-  <!-- Player -->
-  <a-sphere id="player" position="0 1.5 -4" radius="0.3" color="brown"></a-sphere>
+  <!-- Player (camera attached inside) -->
+  <a-entity id="player" position="0 1.5 -4">
+    <a-sphere radius="0.3" color="red"></a-sphere>
+    <a-camera position="0 0 0"></a-camera>
+  </a-entity>
 
   <!-- Grapple Targets -->
   <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
@@ -71,7 +74,7 @@
     const nz = dz / dist;
 
     // *** LAUNCH FORCE ***
-    const launchForce = 0.25;   // increase for faster ODM launch
+    const launchForce = 0.25;
 
     velocity.x = nx * launchForce;
     velocity.y = ny * launchForce;
