@@ -11,25 +11,25 @@
 
 <a-scene>
 
-  <!-- PLAYER (moving object) -->
+  <!-- Player (moving object) -->
   <a-entity id="player" position="0 1.5 -4">
     <a-sphere radius="0.3" color="red"></a-sphere>
 
-    <!-- CAMERA ATTACHED TO PLAYER -->
+    <!-- Camera attached to player -->
     <a-entity camera look-controls position="0 0 0"></a-entity>
   </a-entity>
 
-  <!-- GRAPPLE TARGETS -->
+  <!-- Grapple Targets -->
   <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
   <a-sphere id="rightHook" position="3 3 -4"  radius="0.2" color="blue"></a-sphere>
 
-  <!-- GRAPPLE LINE -->
+  <!-- Grapple Line -->
   <a-entity id="grappleLine"
             line="start: 0 0 0; end: 0 0 0; color: #00ffff"
             visible="false">
   </a-entity>
 
-  <!-- GROUND -->
+  <!-- Ground -->
   <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="green"></a-plane>
 
   <a-sky color="lightblue"></a-sky>
@@ -43,7 +43,6 @@
   const line = document.querySelector('#grappleLine');
 
   let activeHook = null;
-  let grappling = false;
 
   // Player velocity
   let velocity = {x: 0, y: 0, z: 0};
@@ -59,7 +58,7 @@
     const p = vec3(player);
     const h = vec3(activeHook);
 
-    // Draw cable
+    // Draw line
     line.setAttribute('visible', true);
     line.setAttribute('line', `start: ${p.x} ${p.y} ${p.z}; end: ${h.x} ${h.y} ${h.z}`);
 
@@ -70,15 +69,15 @@
 
     const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-    // Normalize
+    // Normalize direction
     const nx = dx / dist;
     const ny = dy / dist;
     const nz = dz / dist;
 
-    // Launch force
+    // *** LAUNCH FORCE ***
     const launchForce = 0.25;
 
-    // Apply velocity
+    // Set velocity toward hook
     velocity.x = nx * launchForce;
     velocity.y = ny * launchForce;
     velocity.z = nz * launchForce;
@@ -88,18 +87,15 @@
   window.addEventListener('keydown', (e) => {
     if (e.key === 'q' || e.key === 'Q') {
       activeHook = leftHook;
-      grappling = true;
-      launchTowardHook();
+      launchTowardHook(); // fire instantly
     }
     if (e.key === 'e' || e.key === 'E') {
       activeHook = rightHook;
-      grappling = true;
-      launchTowardHook();
+      launchTowardHook(); // fire instantly
     }
   });
 
   window.addEventListener('keyup', () => {
-    grappling = false;
     activeHook = null;
     line.setAttribute('visible', false);
   });
@@ -108,12 +104,18 @@
   function tick() {
     const p = vec3(player);
 
-    // Move player
+    // Apply velocity to player
     player.setAttribute('position', {
       x: p.x + velocity.x,
       y: p.y + velocity.y,
       z: p.z + velocity.z
     });
+
+    // Update line if active
+    if (activeHook) {
+      const h = vec3(activeHook);
+      line.setAttribute('line', `start: ${p.x} ${p.y} ${p.z}; end: ${h.x} ${h.y} ${h.z}`);
+    }
 
     // Momentum decay
     velocity.x *= 0.97;
@@ -128,4 +130,3 @@
 
 </body>
 </html>
-
