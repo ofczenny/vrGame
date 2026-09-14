@@ -43,6 +43,7 @@
   const line = document.querySelector('#grappleLine');
 
   let activeHook = null;
+  let launching = false;
 
   // Player velocity
   let velocity = {x: 0, y: 0, z: 0};
@@ -53,7 +54,7 @@
   }
 
   function launchTowardHook() {
-    if (!activeHook) return;
+    if (!launching || !activeHook) return;
 
     const p = vec3(player);
     const h = vec3(activeHook);
@@ -87,15 +88,18 @@
   window.addEventListener('keydown', (e) => {
     if (e.key === 'q' || e.key === 'Q') {
       activeHook = leftHook;
-      launchTowardHook(); // fire instantly
+      launching = true;
+      launchTowardHook();
     }
     if (e.key === 'e' || e.key === 'E') {
       activeHook = rightHook;
-      launchTowardHook(); // fire instantly
+      launching = true;
+      launchTowardHook();
     }
   });
 
   window.addEventListener('keyup', () => {
+    launching = false;
     activeHook = null;
     line.setAttribute('visible', false);
   });
@@ -110,12 +114,6 @@
       y: p.y + velocity.y,
       z: p.z + velocity.z
     });
-
-    // Update line if active
-    if (activeHook) {
-      const h = vec3(activeHook);
-      line.setAttribute('line', `start: ${p.x} ${p.y} ${p.z}; end: ${h.x} ${h.y} ${h.z}`);
-    }
 
     // Momentum decay
     velocity.x *= 0.97;
