@@ -73,16 +73,10 @@
     // *** LAUNCH FORCE ***
     const launchForce = 0.25;   // increase for faster ODM launch
 
+    // Set velocity toward hook
     velocity.x = nx * launchForce;
     velocity.y = ny * launchForce;
     velocity.z = nz * launchForce;
-
-    // Apply velocity
-    player.setAttribute('position', {
-      x: p.x + velocity.x,
-      y: p.y + velocity.y,
-      z: p.z + velocity.z
-    });
   }
 
   // Key controls
@@ -90,10 +84,12 @@
     if (e.key === 'q' || e.key === 'Q') {
       activeHook = leftHook;
       launching = true;
+      launchTowardHook(); // fire instantly
     }
     if (e.key === 'e' || e.key === 'E') {
       activeHook = rightHook;
       launching = true;
+      launchTowardHook(); // fire instantly
     }
   });
 
@@ -105,17 +101,16 @@
 
   // Game loop
   function tick() {
-    launchTowardHook();
-
-    // Momentum continues
     const p = vec3(player);
+
+    // Apply velocity to player
     player.setAttribute('position', {
       x: p.x + velocity.x,
       y: p.y + velocity.y,
       z: p.z + velocity.z
     });
 
-    // Slow down gradually
+    // Slow down gradually (momentum)
     velocity.x *= 0.97;
     velocity.y *= 0.97;
     velocity.z *= 0.97;
