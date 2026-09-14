@@ -11,13 +11,8 @@
 
 <a-scene>
 
-  <!-- Player (moving object) -->
-  <a-entity id="player" position="0 1.5 -4">
-    <a-sphere radius="0.3" color="red"></a-sphere>
-
-    <!-- Camera attached to player -->
-    <a-entity camera look-controls position="0 0 0"></a-entity>
-  </a-entity>
+  <!-- Player -->
+  <a-sphere id="player" position="0 1.5 -4" radius="0.3" color="brown"></a-sphere>
 
   <!-- Grapple Targets -->
   <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
@@ -76,12 +71,18 @@
     const nz = dz / dist;
 
     // *** LAUNCH FORCE ***
-    const launchForce = 0.25;
+    const launchForce = 0.25;   // increase for faster ODM launch
 
-    // Set velocity toward hook
     velocity.x = nx * launchForce;
     velocity.y = ny * launchForce;
     velocity.z = nz * launchForce;
+
+    // Apply velocity
+    player.setAttribute('position', {
+      x: p.x + velocity.x,
+      y: p.y + velocity.y,
+      z: p.z + velocity.z
+    });
   }
 
   // Key controls
@@ -89,12 +90,10 @@
     if (e.key === 'q' || e.key === 'Q') {
       activeHook = leftHook;
       launching = true;
-      launchTowardHook();
     }
     if (e.key === 'e' || e.key === 'E') {
       activeHook = rightHook;
       launching = true;
-      launchTowardHook();
     }
   });
 
@@ -106,16 +105,17 @@
 
   // Game loop
   function tick() {
-    const p = vec3(player);
+    launchTowardHook();
 
-    // Apply velocity to player
+    // Momentum continues
+    const p = vec3(player);
     player.setAttribute('position', {
       x: p.x + velocity.x,
       y: p.y + velocity.y,
       z: p.z + velocity.z
     });
 
-    // Momentum decay
+    // Slow down gradually
     velocity.x *= 0.97;
     velocity.y *= 0.97;
     velocity.z *= 0.97;
