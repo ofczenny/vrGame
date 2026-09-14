@@ -11,8 +11,13 @@
 
 <a-scene>
 
-  <!-- Player -->
-  <a-sphere id="player" position="0 1.5 -4" radius="0.3" color="red"></a-sphere>
+  <!-- Player (moving object) -->
+  <a-entity id="player" position="0 1.5 -4">
+    <a-sphere radius="0.3" color="red"></a-sphere>
+
+    <!-- Camera attached to player -->
+    <a-entity camera look-controls position="0 0 0"></a-entity>
+  </a-entity>
 
   <!-- Grapple Targets -->
   <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
@@ -71,7 +76,7 @@
     const nz = dz / dist;
 
     // *** LAUNCH FORCE ***
-    const launchForce = 0.25;   // increase for faster ODM launch
+    const launchForce = 0.25;
 
     // Set velocity toward hook
     velocity.x = nx * launchForce;
@@ -84,12 +89,12 @@
     if (e.key === 'q' || e.key === 'Q') {
       activeHook = leftHook;
       launching = true;
-      launchTowardHook(); // fire instantly
+      launchTowardHook();
     }
     if (e.key === 'e' || e.key === 'E') {
       activeHook = rightHook;
       launching = true;
-      launchTowardHook(); // fire instantly
+      launchTowardHook();
     }
   });
 
@@ -110,7 +115,7 @@
       z: p.z + velocity.z
     });
 
-    // Slow down gradually (momentum)
+    // Momentum decay
     velocity.x *= 0.97;
     velocity.y *= 0.97;
     velocity.z *= 0.97;
