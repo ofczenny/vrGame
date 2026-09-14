@@ -2,32 +2,121 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>A-Frame Test</title>
+  <title>ODM Gear Demo</title>
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
 </head>
 
 <body>
 
-  <a-scene>
+<a-scene>
 
-    <a-box
-      position="0 1.5 -4"
-      rotation="0 45 0"
-      color="red">
-    </a-box>
+  <!-- Player -->
+  <a-sphere id="player" position="0 1.5 -4" radius="0.3" color="red"></a-sphere>
 
-    <a-plane
-      position="0 0 -4"
-      rotation="-90 0 0"
-      width="20"
-      height="20"
-      color="green">
-    </a-plane>
+  <!-- Grapple Targets -->
+  <a-sphere id="leftHook"  position="-3 3 -4" radius="0.2" color="blue"></a-sphere>
+  <a-sphere id="rightHook" position="3 3 -4"  radius="0.2" color="blue"></a-sphere>
 
-    <a-sky color="lightblue"></a-sky>
+  <!-- Grapple Line -->
+  <a-entity id="grappleLine"
+            line="start: 0 0 0; end: 0 0 0; color: #00ffff"
+            visible="false">
+  </a-entity>
 
-  </a-scene>
+  <!-- Ground -->
+  <a-plane position="0 0 -4" rotation="-90 0 0" width="20" height="20" color="green"></a-plane>
+
+  <a-sky color="lightblue"></a-sky>
+
+</a-scene>
+
+<script>
+  const player = document.querySelector('#player');
+  const leftHook = document.querySelector('#leftHook');
+  const rightHook = document.querySelector('#rightHook');
+  const line = document.querySelector('#grappleLine');
+
+  let activeHook = null;
+  let pulling = false;
+
+  // Simple velocity system
+  let velocity = {x: 0, y: 0, z: 0};
+
+  function vec3(a) {
+    const p = a.getAttribute('position');
+    return {x: p.x, y: p.y, z: p.z};
+  }
+
+  function updateGrapple() {
+    if (!pulling || !activeHook) return;
+
+    const p = vec3(player);
+    const h = vec3(activeHook);
+
+    // Draw line
+    line.setAttribute('visible', true);
+    line.setAttribute('line', `start: ${p.x} ${p.y} ${p.z}; end: ${h.x} ${h.y} ${h.z}; color: #00ffff`);
+
+    // Direction vector
+    const dx = h.x - p.x;
+    const dy = h.y - p.y;
+    const dz = h.z - p.z;
+
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+    // Normalize
+    const nx = dx / dist;
+    const ny = dy / dist;
+    const nz = dz / dist;
+
+    // Pull strength
+    const pull = 0.05;
+
+    velocity.x += nx * pull;
+    velocity.y += ny * pull;
+    velocity.z += nz * pull;
+
+    // Apply velocity
+    player.setAttribute('position', {
+      x: p.x + velocity.x,
+      y: p.y + velocity.y,
+      z: p.z + velocity.z
+    });
+  }
+
+  // Key controls
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'q' || e.key === 'Q') {
+      activeHook = leftHook;
+      pulling = true;
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      activeHook = rightHook;
+      pulling = true;
+    }
+  });
+
+  window.addEventListener('keyup', () => {
+    pulling = false;
+    activeHook = null;
+    line.setAttribute('visible', false);
+  });
+
+  // Game loop
+  function tick() {
+    updateGrapple();
+
+    // Slow down over time
+    velocity.x *= 0.95;
+    velocity.y *= 0.95;
+    velocity.z *= 0.95;
+
+    requestAnimationFrame(tick);
+  }
+
+  tick();
+</script>
 
 </body>
 </html>
