@@ -10,7 +10,10 @@
 <body>
 
 <a-scene>
-
+  <!-- Player rig: odm-gear moves this entity, look-controls/wasd-controls live on the inner camera -->
+    <a-entity id="rig" odm-gear position="0 1.6 2">
+      <a-entity camera look-controls wasd-controls></a-entity>
+    </a-entity>
   <!-- Player is now the camera -->
   <a-entity id="player"
             camera
@@ -36,7 +39,149 @@
   <a-sky color="lightblue"></a-sky>
 
 </a-scene>
+ <script>
+    // Attack on Titan-style ODM (3D Maneuver) gear.
+    // Q fires/reels the left hook, E fires/reels the right hook. Aim with the mouse/head look;
+    // the hook grapples the nearest "grapple-target" surface it's aimed at (or a point in mid-air
+    // at max range if nothing is hit) and pulls the rig toward it while the key is held. Releasing
+    // the key lets go, keeping the momentum built up (gravity takes back over).
+    AFRAME.registerComponent('odm-gear', {
+      schema: {
+        hookRange: {default: 25},
+        pullAccel: {default: 30},
+        gravity: {default: -9.8},
+        maxFallSpeed: {default: -18},
+        drag: {default: 0.995},
+        groundY: {default: 1.6}
+      },
 
+      init: function () {
+        this.velocity = new THREE.Vector3();
+        this.hooks = {q: null, e: null};
+        this.raycaster = new THREE.Raycaster();
+        this.targets = [];
+
+        this.el.sceneEl.addEventListener('loaded', () => {
+          this.targets = Array.prototype.slice.call(
+            document.querySelectorAll('.grapple-target')
+          ).map((el) => el.object3D);
+        });
+
+        this.onKeyDown = this.onKeyDown.bind(this);
+        this.onKeyUp = this.onKeyUp.bind(this);
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
+      },
+
+      remove: function () {
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
+        this.releaseHook('q');
+        this.releaseHook('e');
+      },
+
+      onKeyDown: function (evt) {
+        if (evt.repeat) return;
+        const key = evt.key.toLowerCase();
+        if (key === 'e' && !this.hooks.e) this.fireHook('e', 1);
+        if (key === 'q' && !this.hooks.q) this.fireHook('q', -1);
+      },
+
+      onKeyUp: function (evt) {
+        const key = evt.key.toLowerCase();
+        if (key === 'e') this.releaseHook('e');
+        if (key === 'q') this.releaseHook('q');
+      },
+
+      fireHook: function (key, side) {
+        const cameraEl = this.el.querySelector('[camera]');
+        if (!cameraEl || !cameraEl.object3D) return;
+        const camObj = cameraEl.object3D;
+
+        const origin = new THREE.Vector3();
+        camObj.getWorldPosition(origin);
+
+        const direction = new THREE.Vector3();
+        camObj.getWorldDirection(direction);
+        // Angle each hook out to its own side/up a bit, so the two hooks swing differently.
+        const sideOffset = new THREE.Vector3(side * 0.45, 0.25, 0).applyQuaternion(camObj.getWorldQuaternion(new THREE.Quaternion()));
+        direction.add(sideOffset).normalize();
+
+        this.raycaster.set(origin, direction);
+        this.raycaster.far = this.data.hookRange;
+
+        let anchor;
+        const hits = this.targets.length ? this.raycaster.intersectObjects(this.targets, true) : [];
+        if (hits.length > 0) {
+          anchor = hits[0].point.clone();
+        } else {
+          anchor = origin.clone().addScaledVector(direction, this.data.hookRange);
+        }
+
+        const line = document.createElement('a-entity');
+        line.setAttribute('line', {
+          start: '0 0 0',
+          end: '0 0 0',
+          color: key === 'e' ? '#ff4d4d' : '#4da6ff'
+        });
+        this.el.sceneEl.appendChild(line);
+
+        this.hooks[key] = {anchor: anchor, line: line};
+      },
+
+      releaseHook: function (key) {
+        const hook = this.hooks[key];
+        if (!hook) return;
+        if (hook.line && hook.line.parentNode) hook.line.parentNode.removeChild(hook.line);
+        this.hooks[key] = null;
+      },
+
+      tick: function (time, delta) {
+        if (!delta) return;
+        const dt = Math.min(delta / 1000, 0.1);
+        const rigPos = this.el.object3D.position;
+        let grappling = false;
+
+        ['q', 'e'].forEach((key) => {
+          const hook = this.hooks[key];
+          if (!hook) return;
+          grappling = true;
+
+          const toAnchor = hook.anchor.clone().sub(rigPos);
+          const dist = toAnchor.length();
+          if (dist < 0.75) {
+            this.releaseHook(key);
+            return;
+          }
+          toAnchor.normalize();
+          this.velocity.addScaledVector(toAnchor, this.data.pullAccel * dt);
+
+          if (hook.line) {
+            hook.line.setAttribute('line', {
+              start: rigPos.x + ' ' + rigPos.y + ' ' + rigPos.z,
+              end: hook.anchor.x + ' ' + hook.anchor.y + ' ' + hook.anchor.z
+            });
+          }
+        });
+
+        if (!grappling) {
+          this.velocity.y += this.data.gravity * dt;
+          if (this.velocity.y < this.data.maxFallSpeed) this.velocity.y = this.data.maxFallSpeed;
+        }
+
+        this.velocity.multiplyScalar(this.data.drag);
+        rigPos.addScaledVector(this.velocity, dt);
+
+        if (rigPos.y < this.data.groundY) {
+          rigPos.y = this.data.groundY;
+          this.velocity.y = 0;
+        }
+
+        rigPos.x = THREE.MathUtils.clamp(rigPos.x, -9.5, 9.5);
+        rigPos.z = THREE.MathUtils.clamp(rigPos.z, -9.5, 9.5);
+        rigPos.y = Math.min(rigPos.y, 12);
+      }
+    });
 <script>
   const player = document.querySelector('#player');
   const leftHook = document.querySelector('#leftHook');
