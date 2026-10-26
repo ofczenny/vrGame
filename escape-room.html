@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Clockmaker’s Vault – VR Escape Room</title>
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+<style>html,body{margin:0;height:100%;background:#111}</style>
+<script>
+// A-Frame's built-in text loads its font from cdn.aframe.io, which a hosted page cannot reach,
+// so every <a-text> stays blank. This replacement draws the text onto a canvas instead.
+// It keeps the same attributes (value, color, align, width), so all existing text works.
+delete AFRAME.components.text;
+AFRAME.registerComponent("text", {
+  schema: {
+    value: { type: "string", default: "" },
+    color: { type: "string", default: "#ffffff" },
+    align: { type: "string", default: "left" },
+    width: { type: "number", default: 5 }
+  },
+  init: function () { this.mesh = null; this.draw(); },
+  update: function () { this.draw(); },
+  remove: function () { this.el.removeObject3D("text"); },
+  draw: function () {
+    var THREE = AFRAME.THREE;
+    var d = this.data;
+    var em = 64, pad = 8;
+    var lines = String(d.value).split("\n");
+    var canvas = document.createElement("canvas");
+    var ctx = canvas.getContext("2d");
+    var font = "bold " + em + "px Arial, Helvetica, sans-serif";
+    ctx.font = font;
+    var maxW = 0;
+    lines.forEach(function (l) { maxW = Math.max(maxW, ctx.measureText(l).width); });
+    var lineH = em * 1.25;
+    canvas.width = Math.max(2, Math.ceil(maxW + pad * 2));
+    canvas.height = Math.max(2, Math.ceil(lineH * lines.length + pad * 2));
+    ctx.font = font;
+    ctx.fillStyle = d.color;
+    ctx.textBaseline = "middle";
+    var x = pad;
+    ctx.textAlign = "left";
+    if (d.align === "center") { ctx.textAlign = "center"; x = canvas.width / 2; }
+    else if (d.align === "right") { ctx.textAlign = "right"; x = canvas.width - pad; }
+    lines.forEach(function (l, i) { ctx.fillText(l, x, pad + lineH * (i + 0.5)); });
+    var k = (d.width / 22) / em;               // world units per canvas pixel
+    var w = canvas.width * k, h = canvas.height * k;
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    if (THREE.sRGBEncoding) { tex.encoding = THREE.sRGBEncoding; }
+    if (this.mesh) {
+      this.mesh.material.map.dispose(); this.mesh.material.dispose(); this.mesh.geometry.dispose();
+    }
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    // left-aligned text starts at the entity position, right-aligned ends there, centred is centred
+    if (d.align === "left") { mesh.position.x = w / 2 - pad * k; }
+    else if (d.align === "right") { mesh.position.x = -w / 2 + pad * k; }
+    this.mesh = mesh;
+    this.el.setObject3D("text", mesh);
+  }
+});
+</script>
+</head>
+<body>
+<a-scene background="color: #0b0b14">
+  <!-- LIGHTING -->
+  <a-entity id="ambient-light" light="type: ambient; color: #556; intensity: 0.6"></a-entity>
+  <a-entity id="lamp-light" light="type: point; color: #ffb866; intensity: 1.1; distance: 12" position="0 2.6 0"></a-entity>
+  <a-entity id="door-spotlight" light="type: spot; color: #fff; intensity: 0.8; angle: 40" position="0 2.8 -2" rotation="-60 0 0"></a-entity>
+
+  <!-- ROOM -->
+  <a-plane id="floor" rotation="-90 0 0" width="8" height="8" color="#5a4632"></a-plane>
+  <a-plane id="ceiling" rotation="90 0 0" position="0 3 0" width="8" height="8" color="#2b2b3a"></a-plane>
+  <a-box id="wall-north" position="0 1.5 -4" width="8" height="3" depth="0.2" color="#6b5b7b"></a-box>
+  <a-box id="wall-south" position="0 1.5 4" width="8" height="3" depth="0.2" color="#6b5b7b"></a-box>
+  <a-box id="wall-west" position="-4 1.5 0" width="0.2" height="3" depth="8" color="#5b6b7b"></a-box>
+  <a-box id="wall-east" position="4 1.5 0" width="0.2" height="3" depth="8" color="#5b6b7b"></a-box>
+
+  <!-- DOOR (north wall) -->
+  <a-box id="exit-door" class="clickable" position="-1.5 1.1 -3.85" width="1.4" height="2.2" depth="0.1" color="#7a3b1e">
+    <a-sphere position="0.5 0 0.08" radius="0.07" color="gold"></a-sphere>
+  </a-box>
+  <a-text id="door-sign" value="EXIT" position="-1.5 2.4 -3.85" align="center" color="#f55" width="4"></a-text>
+  <a-light id="exit-glow" type="point" color="#0f0" intensity="0" position="-1.5 1.5 -3" distance="6"></a-light>
+
+  <!-- KEYPAD (north wall) -->
+  <a-box id="keypad-panel" position="1.5 1.2 -3.85" width="1.1" height="1.7" depth="0.08" color="#222"></a-box>
+  <a-text id="keypad-screen" value="---" position="1.5 1.85 -3.78" align="center" color="#0f0" width="3"></a-text>
+
+  <!-- COLOUR PUZZLE (west wall) -->
+  <a-box id="clue-poster" position="-3.85 1.9 -1" rotation="0 90 0" width="1.6" height="0.9" depth="0.05" color="#e8dcc0"></a-box>
+  <a-text id="clue-poster-text" value="SUNSET, then OCEAN,\nthen LEAF" position="-3.8 1.9 -1" rotation="0 90 0" align="center" color="#222" width="2.2"></a-text>
+  <a-box id="button-red" class="clickable" position="-3.8 1.1 -1.6" width="0.3" height="0.3" depth="0.1" rotation="0 90 0" color="#d22"></a-box>
+  <a-box id="button-green" class="clickable" position="-3.8 1.1 -1" width="0.3" height="0.3" depth="0.1" rotation="0 90 0" color="#2a2"></a-box>
+  <a-box id="button-blue" class="clickable" position="-3.8 1.1 -0.4" width="0.3" height="0.3" depth="0.1" rotation="0 90 0" color="#22d"></a-box>
+
+  <!-- CHEST (puzzle 1 reward) -->
+  <a-box id="chest-base" position="-3 0.25 -2.8" width="1" height="0.5" depth="0.6" color="#8b5a2b"></a-box>
+  <a-box id="chest-lid" position="-3 0.55 -2.8" width="1" height="0.1" depth="0.6" color="#a0682f"></a-box>
+  <a-box id="gold-key" class="clickable" visible="false" position="-3 0.6 -2.8" width="0.35" height="0.08" depth="0.08" color="gold"></a-box>
+
+  <!-- CODE CLUES (puzzle 2) -->
+  <a-box id="bookshelf" position="3.6 1 -1" width="0.6" height="2" depth="1.6" color="#4a3020"></a-box>
+  <a-box id="clue-book" class="clickable" position="3.25 1.4 -1" width="0.25" height="0.35" depth="0.2" color="#c33"></a-box>
+  <a-cylinder id="clue-lamp" class="clickable" position="2.8 0.55 1.5" radius="0.2" height="0.5" color="#e8c860"></a-cylinder>
+  <a-box id="side-table" position="2.8 0.15 1.5" width="0.8" height="0.3" depth="0.8" color="#3a2a1a"></a-box>
+  <a-sphere id="clue-teddy" class="clickable" position="-2.5 0.3 2.3" radius="0.3" color="#b5834a"></a-sphere>
+
+  <!-- WORLD TEXT -->
+  <a-text id="title-sign" value="THE CLOCKMAKER’S VAULT" position="0 2.65 -3.85" align="center" color="#fc6" width="6"></a-text>
+  <a-text id="keypad-label" value="KEYPAD (3 digits)" position="1.5 2.15 -3.78" align="center" color="#fff" width="3"></a-text>
+  <a-text id="keypad-hint" value="Clues are hidden\naround the room" position="1.5 0.43 -3.78" align="center" color="#fc6" width="2"></a-text>
+  <a-text id="colour-panel-label" value="COLOUR PANEL\nPress in the order of the poster" position="-3.8 0.7 -1" rotation="0 90 0" align="center" color="#fff" width="2"></a-text>
+  <a-text id="chest-label" value="LOCKED CHEST" position="-3 1 -2.8" align="center" color="#fff" width="2"></a-text>
+  <a-text id="bookshelf-label" value="BOOKSHELF" position="3.25 2.2 -1" rotation="0 -90 0" align="center" color="#fff" width="2"></a-text>
+  <a-text id="lamp-label" value="OLD LAMP" position="2.8 1.05 1.5" rotation="0 -90 0" align="center" color="#fff" width="1.6"></a-text>
+  <a-text id="teddy-label" value="TEDDY BEAR" position="-2.5 0.75 2.3" align="center" color="#fff" width="1.6"></a-text>
+  <a-text id="controls-sign" value="CONTROLS\nW A S D : walk\nARROW KEYS : turn camera\nSPACE or E : interact (look at it or stand close)\nMOUSE : look and click\n\nGOAL: find the key and the 3-digit code,\nthen open the exit door." position="0 1.8 3.85" rotation="0 180 0" align="center" color="#9cf" width="4"></a-text>
+
+  <!-- ROBLOX-STYLE INTERACTION PROMPT (moves to the nearest / targeted object) -->
+  <a-entity id="prompt-panel" look-at="#player-camera">
+    <a-plane id="prompt-border" width="1.34" height="0.34" color="#ffffff" opacity="0.9" position="0 0 -0.003"></a-plane>
+    <a-plane id="prompt-background" width="1.3" height="0.3" color="#15151c" opacity="0.92"></a-plane>
+    <a-plane id="prompt-keycap" width="0.2" height="0.2" color="#f2f2f2" position="-0.52 0 0.003"></a-plane>
+    <a-text id="prompt-key-letter" value="E" color="#111" align="center" width="2.4" position="-0.52 0 0.006"></a-text>
+    <a-text id="prompt-text" value="Interact" color="#fff" align="left" width="2" position="-0.38 0 0.006"></a-text>
+  </a-entity>
+
+  <!-- PLAYER -->
+  <a-entity id="player-rig" position="0 0 2.5">
+    <a-camera id="player-camera" wasd-controls="acceleration: 25; arrowKeysEnabled: false">
+      <a-cursor id="player-cursor" raycaster="objects: .clickable" color="white"></a-cursor>
+      <a-text id="hud-message" value="Welcome! You are locked in the vault.\nTurn with ARROW KEYS, press E to interact." position="0 -0.55 -1" align="center" color="#fff" width="1.6"></a-text>
+      <a-text id="hud-inventory" value="Key: no   |   Code digits: 0/3" position="0 0.55 -1" align="center" color="#fc6" width="1.3"></a-text>
+      <a-text id="hud-hint" value="" position="0 -0.12 -1" align="center" color="#8f8" width="1.2"></a-text>
+    </a-camera>
+  </a-entity>
+</a-scene>
+
+<script>
+// ---------- GAME STATE (variables) ----------
+var colourAnswer = ["red", "blue", "green"];   // sunset, ocean, leaf
+var colourInput = [];                          // collection of presses
+var chestOpen = false;                         // Boolean
+var hasKey = false;                            // Boolean
+var codeCorrect = false;                       // Boolean
+var gameWon = false;
+var secretCode = "372";
+var typedCode = "";
+var digitsFound = 0;                           // counter
+var foundClues = {};                           // which clues were already read
+
+// ---------- HELPER FUNCTIONS ----------
+function setMessage(text) {
+  document.getElementById("hud-message").setAttribute("value", text);
+}
+
+function updateHud() {
+  var keyText = hasKey ? "yes" : "no";
+  document.getElementById("hud-inventory").setAttribute("value",
+    "Key: " + keyText + "   |   Code digits: " + digitsFound + "/3");
+}
+
+function pressColour(colour) {
+  if (chestOpen) { setMessage("The chest is already open."); return; }
+  colourInput.push(colour);
+  var i = colourInput.length - 1;
+  if (colourInput[i] !== colourAnswer[i]) {
+    colourInput = [];
+    setMessage("Wrong order! The panel buzzes and resets.");
+  } else if (colourInput.length === colourAnswer.length) {
+    chestOpen = true;
+    document.getElementById("chest-lid").setAttribute("animation",
+      "property: rotation; to: -100 0 0; dur: 800");
+    document.getElementById("chest-lid").setAttribute("position", "-3 0.8 -3.15");
+    document.getElementById("gold-key").setAttribute("visible", "true");
+    setMessage("Click! The chest opens. A golden key is inside!");
+  } else {
+    setMessage("Good... " + colourInput.length + " of 3 correct.");
+  }
+}
+
+function readClue(id, digit, text) {
+  if (foundClues[id]) { setMessage(text); return; }
+  foundClues[id] = true;
+  digitsFound++;
+  updateHud();
+  setMessage(text + " (digit " + digitsFound + " of 3 found)");
+}
+
+function checkDoor() {
+  if (gameWon) return;
+  if (hasKey && codeCorrect) {
+    gameWon = true;
+    document.getElementById("exit-door").setAttribute("animation",
+      "property: position; to: -1.5 3.4 -3.85; dur: 2500");
+    document.getElementById("exit-glow").setAttribute("intensity", "2");
+    document.getElementById("door-sign").setAttribute("color", "#0f0");
+    setMessage("The door slides open... YOU ESCAPED! Well done!");
+  } else if (!hasKey && !codeCorrect) {
+    setMessage("The door is locked. It needs a key AND a 3-digit code.");
+  } else if (!hasKey) {
+    setMessage("The keypad accepted the code, but the door still needs a key.");
+  } else {
+    setMessage("You have the key, but the keypad code is not entered yet.");
+  }
+}
+
+function pressDigit(d) {
+  if (codeCorrect) { setMessage("Code already accepted."); return; }
+  if (d === "C") {
+    typedCode = "";
+  } else {
+    typedCode += d;
+  }
+  var shown = typedCode;
+  while (shown.length < 3) { shown += "-"; }
+  document.getElementById("keypad-screen").setAttribute("value", shown);
+  if (typedCode.length === 3) {
+    if (typedCode === secretCode) {
+      codeCorrect = true;
+      document.getElementById("keypad-screen").setAttribute("color", "#0f0");
+      setMessage("Code accepted!");
+      checkDoor();
+    } else {
+      typedCode = "";
+      document.getElementById("keypad-screen").setAttribute("color", "#f33");
+      setMessage("Wrong code. Try again.");
+      setTimeout(function () {
+        document.getElementById("keypad-screen").setAttribute("value", "---");
+        document.getElementById("keypad-screen").setAttribute("color", "#0f0");
+      }, 900);
+    }
+  }
+}
+
+// ---------- BUILD KEYPAD BUTTONS ----------
+var labels = ["1","2","3","4","5","6","7","8","9","C","0","C"];
+labels.splice(11, 1);                           // 11 buttons: 1-9, C, 0
+var scene = document.querySelector("a-scene");
+labels.forEach(function (label, n) {
+  var b = document.createElement("a-box");
+  b.setAttribute("id", "keypad-button-" + (label === "C" ? "clear" : label));
+  b.setAttribute("class", "clickable");
+  b.setAttribute("width", "0.25"); b.setAttribute("height", "0.25"); b.setAttribute("depth", "0.06");
+  b.setAttribute("color", label === "C" ? "#a33" : "#888");
+  var col = n % 3, row = Math.floor(n / 3);
+  b.setAttribute("position", (1.2 + col * 0.3) + " " + (1.55 - row * 0.3) + " -3.78");
+  var t = document.createElement("a-text");
+  t.setAttribute("value", label); t.setAttribute("align", "center");
+  t.setAttribute("color", "#fff"); t.setAttribute("width", "3");
+  t.setAttribute("position", "0 0 0.04");
+  b.appendChild(t);
+  b.addEventListener("click", function () { pressDigit(label); });
+  scene.appendChild(b);
+});
+
+// ---------- EVENT LISTENERS ----------
+document.getElementById("button-red").addEventListener("click", function () { pressColour("red"); });
+document.getElementById("button-green").addEventListener("click", function () { pressColour("green"); });
+document.getElementById("button-blue").addEventListener("click", function () { pressColour("blue"); });
+
+document.getElementById("clue-book").addEventListener("click", function () {
+  readClue("book", "3", "Inside the book, a page is circled: 3");
+});
+document.getElementById("clue-lamp").addEventListener("click", function () {
+  readClue("lamp", "7", "Scratched under the lamp: 7");
+});
+document.getElementById("clue-teddy").addEventListener("click", function () {
+  readClue("teddy", "2", "A tag sewn on the teddy says: 2");
+});
+
+document.getElementById("gold-key").addEventListener("click", function () {
+  hasKey = true;
+  this.setAttribute("visible", "false");
+  this.classList.remove("clickable");
+  updateHud();
+  setMessage("You picked up the golden key!");
+  checkDoor();
+});
+
+document.getElementById("exit-door").addEventListener("click", checkDoor);
+
+// names shown in the crosshair hint
+var objectNames = {
+  "exit-door": "Exit door", "button-red": "Red button", "button-green": "Green button",
+  "button-blue": "Blue button", "gold-key": "Golden key", "clue-book": "Red book",
+  "clue-lamp": "Old lamp", "clue-teddy": "Teddy bear"
+};
+
+// ---------- ROBLOX-STYLE PROMPTS, SOUND AND COLLISION ----------
+var actionText = {
+  "exit-door": "Try the door", "button-red": "Press key: Red", "button-green": "Press key: Green",
+  "button-blue": "Press key: Blue", "gold-key": "Take key", "clue-book": "Read book",
+  "clue-lamp": "Inspect lamp", "clue-teddy": "Check teddy"
+};
+var tmpA = new AFRAME.THREE.Vector3();
+var tmpB = new AFRAME.THREE.Vector3();
+var currentTarget = null;
+var audioCtx = null;
+
+function beep(freq, dur) {
+  try {
+    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.value = 0.05;
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + dur);
+  } catch (err) { /* sound is optional */ }
+}
+
+function getActionText(el) {
+  if (actionText[el.id]) { return actionText[el.id]; }
+  return "Press key: " + el.id.replace("keypad-button-", "").replace("clear", "CLEAR");
+}
+
+// crosshair target wins; otherwise the nearest interactable within 2 metres
+function pickTarget() {
+  document.getElementById("player-camera").object3D.getWorldPosition(tmpA);
+  var cursor = document.getElementById("player-cursor");
+  var looked = cursor.components.cursor ? cursor.components.cursor.intersectedEl : null;
+  if (looked && looked.classList.contains("clickable") && looked.object3D.visible) {
+    looked.object3D.getWorldPosition(tmpB);
+    if (tmpA.distanceTo(tmpB) <= 3.5) { return looked; }
+  }
+  var best = null;
+  var bestDist = 2.0;
+  document.querySelectorAll(".clickable").forEach(function (el) {
+    if (!el.object3D.visible) { return; }
+    el.object3D.getWorldPosition(tmpB);
+    var d = tmpA.distanceTo(tmpB);
+    if (d < bestDist) { best = el; bestDist = d; }
+  });
+  return best;
+}
+
+function updatePrompt() {
+  var panel = document.getElementById("prompt-panel");
+  var target = pickTarget();
+  currentTarget = target;
+  if (!target) { panel.object3D.visible = false; return; }
+  target.object3D.getWorldPosition(tmpB);
+  var lift = target.id.indexOf("keypad-button") === 0 ? 0.3 : 0.55;
+  // nudge the panel toward the player so it never sits inside a wall
+  var dx = tmpA.x - tmpB.x;
+  var dz = tmpA.z - tmpB.z;
+  var len = Math.sqrt(dx * dx + dz * dz) || 1;
+  panel.object3D.position.set(tmpB.x + (dx / len) * 0.35, tmpB.y + lift, tmpB.z + (dz / len) * 0.35);
+  panel.object3D.visible = true;
+  document.getElementById("prompt-text").setAttribute("value", getActionText(target));
+}
+
+// solid walls and furniture (x, z are world coordinates; the rig starts at z = 2.5)
+var rigOffsetZ = 2.5;
+var wallLimit = 3.5;
+var playerRadius = 0.3;
+var obstacles = [
+  { x: -3, z: -2.8, hx: 0.5, hz: 0.3 },   // chest
+  { x: 3.6, z: -1, hx: 0.3, hz: 0.8 },    // bookshelf
+  { x: 2.8, z: 1.5, hx: 0.4, hz: 0.4 },   // side table + lamp
+  { x: -2.5, z: 2.3, hx: 0.3, hz: 0.3 }   // teddy bear
+];
+
+function keepInsideRoom() {
+  var pos = document.getElementById("player-camera").object3D.position;
+  var wx = pos.x;
+  var wz = pos.z + rigOffsetZ;
+  if (wx > wallLimit) { wx = wallLimit; } else if (wx < -wallLimit) { wx = -wallLimit; }
+  if (wz > wallLimit) { wz = wallLimit; } else if (wz < -wallLimit) { wz = -wallLimit; }
+  obstacles.forEach(function (o) {
+    var dx = wx - o.x;
+    var dz = wz - o.z;
+    var overlapX = o.hx + playerRadius - Math.abs(dx);
+    var overlapZ = o.hz + playerRadius - Math.abs(dz);
+    if (overlapX > 0 && overlapZ > 0) {
+      if (overlapX < overlapZ) { wx += (dx >= 0 ? overlapX : -overlapX); }
+      else { wz += (dz >= 0 ? overlapZ : -overlapZ); }
+    }
+  });
+  pos.x = wx;
+  pos.z = wz - rigOffsetZ;
+}
+
+// hover feedback on all interactive objects
+document.querySelectorAll(".clickable").forEach(function (el) {
+  el.addEventListener("mouseenter", function () { el.object3D.scale.set(1.15, 1.15, 1.15); });
+  el.addEventListener("mouseleave", function () { el.object3D.scale.set(1, 1, 1); });
+  // every click (mouse, E or SPACE) gives feedback, so buttons can be pressed again and again
+  el.addEventListener("click", function () { pressFeedback(el); });
+});
+
+function pressFeedback(el) {
+  if (!el.hasAttribute("animation__press")) {
+    el.setAttribute("animation__press",
+      "property: scale; from: 0.8 0.8 0.8; to: 1.15 1.15 1.15; dur: 180; easing: easeOutQuad; startEvents: press");
+  }
+  el.emit("press");                    // restarts the squash animation every time
+  el.setAttribute("material", "emissive", "#ffffff");
+  el.setAttribute("material", "emissiveIntensity", 0.7);
+  setTimeout(function () { el.setAttribute("material", "emissiveIntensity", 0); }, 160);
+  beep(520, 0.08);
+}
+
+// ---------- KEYBOARD CONTROLS ----------
+var keysDown = {};
+
+function activateCrosshair() {
+  var target = pickTarget();
+  if (target) {
+    target.emit("click");            // same event a mouse click fires
+  } else {
+    setMessage("Nothing nearby. Walk closer or aim at an object, then press E.");
+  }
+}
+
+window.addEventListener("keydown", function (e) {
+  var handled = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"];
+  if (handled.indexOf(e.code) !== -1) { e.preventDefault(); }
+  keysDown[e.code] = true;
+  if ((e.code === "Space" || e.code === "KeyE") && !e.repeat) { activateCrosshair(); }
+});
+window.addEventListener("keyup", function (e) { keysDown[e.code] = false; });
+
+var lastFrame = performance.now();
+function turnCamera(now) {
+  var dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  var look = document.getElementById("player-camera").components["look-controls"];
+  if (look && look.yawObject) {
+    var turnSpeed = 1.8;             // radians per second
+    if (keysDown["ArrowLeft"]) { look.yawObject.rotation.y += turnSpeed * dt; }
+    if (keysDown["ArrowRight"]) { look.yawObject.rotation.y -= turnSpeed * dt; }
+    if (keysDown["ArrowUp"]) { look.pitchObject.rotation.x += turnSpeed * dt; }
+    if (keysDown["ArrowDown"]) { look.pitchObject.rotation.x -= turnSpeed * dt; }
+    var limit = Math.PI / 2.2;
+    if (look.pitchObject.rotation.x > limit) { look.pitchObject.rotation.x = limit; }
+    else if (look.pitchObject.rotation.x < -limit) { look.pitchObject.rotation.x = -limit; }
+  }
+  keepInsideRoom();
+  updatePrompt();
+  requestAnimationFrame(turnCamera);
+}
+requestAnimationFrame(turnCamera);
+</script>
+</body>
+</html>
